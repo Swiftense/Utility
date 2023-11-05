@@ -92,7 +92,11 @@ void xstrappendf(XString *str, float f)
         reversed = reversed * DEF_CONVERT_RADIX + (decimals % DEF_CONVERT_RADIX);
     xstrappendToBuff(str, '.');
     for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
+    {
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+        if (reversed == 0)
+            break;
+    }
 }
 
 void xstrappendd(XString *str, double f)
@@ -115,8 +119,12 @@ void xstrappendd(XString *str, double f)
     for (; decimals != 0; decimals /= DEF_CONVERT_RADIX)
         reversed = reversed * DEF_CONVERT_RADIX + (decimals % DEF_CONVERT_RADIX);
     xstrappendToBuff(str, '.');
-    for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
+    for (;; reversed /= DEF_CONVERT_RADIX)
+    {
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+        if (reversed == 0)
+            break;
+    }
 }
 
 /// TODO: Add rounding
