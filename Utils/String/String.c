@@ -134,14 +134,14 @@ char *strcopyusingmalloc(char *str)
 
 char *strccat(char *str1, char *str2)
 {
-    XString con = xstrcreateft(str1);
+    xstrcreateft(con, str1);
     xstrappends(&con, str2);
     return xstrserialize(con);
 }
 
 char *strccatph(char *str1, char ph, char *str2)
 {
-    XString con = xstrcreateft(str1);
+    xstrcreateft(con, str1);
     xstrappend(con, ph);
     xstrappends(&con, str2);
     return xstrserialize(con);
@@ -172,14 +172,14 @@ char *strsearch(char *str1, char *i)
     {
         if (*str1 == *i)
         {
-            char *_ = i;
-            char *__;
-            for (__ = str1;
-                 *__ == *_ && *__ != null && *_ != null;
-                 ++__, ++_)
+            char *cmp1 = i;
+            char *cmp2;
+            for (cmp2 = str1;
+                 *cmp2 == *cmp1 && *cmp2 != null && *cmp1 != null;
+                 ++cmp2, ++cmp1)
                 ;
-            if (*_ == null)
-                return __;
+            if (*cmp1 == null)
+                return cmp2;
         }
     }
     return null;
@@ -191,13 +191,13 @@ char *strsearchbf(char *str1, char *i)
     {
         if (*str1 == *i)
         {
-            char *_ = i;
-            char *__;
-            for (__ = str1;
-                 *__ == *_ && *__ != null && *_ != null;
-                 ++__, ++_)
+            char *cmp1 = i;
+            char *cmp2;
+            for (cmp2 = str1;
+                 *cmp2 == *cmp1 && *cmp2 != null && *cmp1 != null;
+                 ++cmp2, ++cmp1)
                 ;
-            if (*_ == null)
+            if (*cmp1 == null)
                 return str1;
         }
     }

@@ -29,11 +29,9 @@ extern "C"
         ._str = malloc(24), ._size = 0 \
     }
 
-#define xstrcreateft(t) ({           \
-    XString str = xstrcreate();      \
-    xstrappends((XString *)&str, t); \
-    str;                             \
-})
+#define xstrcreateft(name, t)    \
+    XString name = xstrcreate(); \
+    xstrappends((XString *)&name, t);
 
 #define xstrappend(str, ch)                                                 \
     {                                                                       \
@@ -49,7 +47,14 @@ extern "C"
         *(str->_str + (str->_size++)) = ch;                                    \
     }
 
-#define xstrserialize(str) ({xstrappend(str, '\00'); str._str; })
+#define xstrserialize(str) ({                                           \
+    if ((str._size) == malloc_usable_size(str._str))                    \
+        str._str = realloc(str._str, malloc_usable_size(str._str) * 2); \
+    *(str._str + str._size) = '\00';                                    \
+    str._str;                                                           \
+})
+
+#define xstrshrink(str, amount) str._size-=amount 
 
 #define xstrgrow(str)                                \
     if ((str._size) == malloc_usable_size(str._str)) \

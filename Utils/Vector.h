@@ -24,6 +24,14 @@ extern "C"
         unsigned int _size;
     };
 
+
+    typedef struct _Vect_ulong Vect_ulong;
+    struct _Vect_ulong
+    {
+        unsigned long long *_vect;
+        unsigned int _size;
+    };
+
     typedef struct _Vect_double Vect_double;
     struct _Vect_double
     {
