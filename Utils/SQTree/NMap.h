@@ -17,7 +17,7 @@ extern "C"
     extern void *nmap_alloc(NMap *map, _nmap_size size);
     extern void nmap_free(NMap *map, void *addr);
     extern int nmap_top(NMap *map, void *addr);
-    extern void *nmap_seek(NMap *map, void *addr);
+    extern void *nmap_seek(NMap *map, void *addr, _nmap_size size);
     extern _nmap_size nmap_usableSize(void *addr);
 
 #ifdef __cplusplus
