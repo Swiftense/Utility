@@ -31,7 +31,7 @@
 #define __NMAP_DBDIR /*__NMAP_DIR*/ "/db"
 
 #ifndef __USE_XOPEN2K8 /* for use of pread/pwrite functions in vscode */
-    #define __USE_XOPEN2K8 
+#define __USE_XOPEN2K8
 #endif
 
 struct _nmap
@@ -40,7 +40,7 @@ struct _nmap
     _nmap_size dbsize;
     _nmap_size dbcapacity;
     struct _freelink *dbfreelist;
-    void *dbindex;
+    void *dbdir;
     void *map_addr; /* allthough mmap spaces arent shared they shouldn't overlap */
     char *name;
 };
@@ -151,7 +151,7 @@ struct _nmap *nmap_openStorage(const char *name)
         map->dbsize = sizeof(struct _nmap);
 
         /* load mmap */
-        if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED, dbfd, 0) != map->map_addr)
+        if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, dbfd, 0) != map->map_addr)
         {
             printf("nmap_openStorage database limit reached\n");
             return null;
@@ -165,15 +165,15 @@ struct _nmap *nmap_openStorage(const char *name)
         /* write database name to map */
         map->name = (char *)nmap_qalloc(map, name_len * sizeof(char));
         memcpy(map->name, name, name_len);
-        map->dbindex = map->map_addr + map->dbsize;
-        return map;
+        map->dbdir = map->map_addr + map->dbsize;
+        return (void *)map;
         /* database constructor - end */
     }
     free(str._str);
     read(dbfd, map, sizeof(struct _nmap)); /* collect database object */
     /* load mmap */
     // printf("map->map_addr: %llu, map->dbcapacity: %llu, dbfd: %d, map->dbsize: %llu\n", map->map_addr, map->dbcapacity, dbfd, map->dbsize);
-    if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED, dbfd, 0) == MAP_FAILED)
+    if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, dbfd, 0) == MAP_FAILED)
     {
         perror("nmap_openStorage mmap 2");
         return null;
@@ -188,6 +188,10 @@ struct _nmap *nmap_openStorage(const char *name)
     return (void *)map;
 }
 
+NMap *nmap_openStorageOnDevice(char *name, const char *deviceId)
+{
+}
+
 void nmap_closeStorage(NMap *map)
 {
     lseek(map->dbfd, 0, SEEK_SET);
@@ -198,6 +202,13 @@ void nmap_closeStorage(NMap *map)
 
     munmap(map->map_addr, map->dbcapacity);
     munmap(map, sizeof(NMap));
+}
+
+void* nmap_optainDbDir(NMap*map, _nmap_size size)
+{
+    if((map->map_addr + map->dbsize) == map->dbdir)
+        nmap_qalloc(map, size);
+    return map->dbdir;
 }
 
 const char *nmap_getDbName(struct _nmap *map)
@@ -212,7 +223,7 @@ static __attribute__((__always_inline__)) void nmap_grow(struct _nmap *map)
     munmap(map->map_addr, map->dbcapacity);
     lseek(map->dbfd, map->dbcapacity *= 2, SEEK_SET);
     write(map->dbfd, &(char *){0}, 1);
-    mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED, map->dbfd, 0);
+    mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, map->dbfd, 0);
 }
 
 __attribute__((__always_inline__)) void *nmap_qalloc(struct _nmap *map, _nmap_size size)
@@ -270,27 +281,38 @@ __attribute__((__always_inline__)) void *nmap_alloc(struct _nmap *map, _nmap_siz
 
 void *nmap_seek(NMap *map, void *addr, _nmap_size size)
 {
-    size = (size - (size % __NMAP_DEFAULT_PAGESIZE)) + __NMAP_DEFAULT_PAGESIZE;
     register _nmap_size oldsize = _nmap_usableSize(addr);
 
     if (addr == ((map->dbsize + map->map_addr) - oldsize)) /* check if address is on top to increase size */
     {
+        size = (size - (size % __NMAP_DEFAULT_PAGESIZE)) + __NMAP_DEFAULT_PAGESIZE;
+
         map->dbsize += size;
 
         while (map->dbsize > map->dbcapacity)
             nmap_grow(map);
 
         *(((_nmap_head *)addr) - 1) += size; /* update header */
-        return addr; /* addr stays unchanged */
+        return addr;                         /* addr stays unchanged */
     }
 
     /* if addr isnt on top move the entire buff */
 
-    size += oldsize; /* add old size */
-    register _nmap_head* ret = nmap_alloc(map, size); /* new header alr set in alloc function */
+    size += oldsize;                                  /* add old size */
+    register _nmap_head *ret = nmap_alloc(map, size); /* new header alr set in alloc function */
 
-    pread(map->dbfd, ret, oldsize, addr-(map->map_addr)); /* copy old data to new buff */
+    pread(map->dbfd, ret, oldsize, addr - (map->map_addr)); /* copy old data to new buff (i am very proud of this approach since it reads and writes to the data base file/partition with one system call)*/
 
+    nmap_free(map, addr); /* free old buff */
+
+    return ret;
+}
+
+void *nmap_realloc(NMap *map, void *addr, _nmap_size size)
+{
+    register _nmap_head *ret = nmap_alloc(map, size);
+    memcpy(ret, addr, _nmap_usableSize(addr));
+    nmap_free(map, addr); /* free old buff */
     return ret;
 }
 
@@ -308,15 +330,6 @@ void nmap_free(NMap *map, void *addr)
     link->size = *(((_nmap_head *)addr) - 1);
     // printf("\e[92mCREATE LINK\e[0m link: %x, link size: %llu, link buff: \e[31m%llu\e[0m\n", link, link->size, link->buff);
     map->dbfreelist = link;
-}
-
-int nmap_top(NMap *map, void *addr)
-{
-    return addr == (map->dbsize + map->map_addr);
-}
-
-void *nmap_openStorageOnDevice(char *name, const char *deviceId)
-{
 }
 
 #undef _nmap_usableSize
