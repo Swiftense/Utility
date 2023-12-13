@@ -17,16 +17,21 @@ extern "C"
 
     /**
      * @brief attaches storage on a custom device e.g. a file/partition/disk
-     * @param name of storage
+     * @param name of storage, changing it after creation will result in undefined behavior
      * @param device
      * @return the storage attached on <device> corresponding to <name>
      */
-    extern NMap *nmap_openStorageOnDevice(char *name, const char *device);
+    extern NMap *nmap_openStorageOnDevice(const char *name, const char *device);
 
     /**
      * @param map storage that should be detached from current proccess
      */
     extern void nmap_closeStorage(NMap *map);
+
+    /**
+     * @return current page size property for nmap build
+     */
+    extern _nmap_size nmap_getPageSize();
 
     /**
      * @brief returns the address of the database directory, a constant memory block that should be optained after firstly opening the database if needed,

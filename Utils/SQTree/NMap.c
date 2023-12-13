@@ -18,8 +18,8 @@
 #include <sys/types.h>
 
 #define __NMAP_DEFAULT_INITBUFFERSIZE sizeof(struct _nmap)
-#define __NMAP_DEFAULT_PAGESIZE 24 /* this needs to be in an between of not to small to make the free list \
-                                      insufficient to not to large for slowing down cache speeds (24 is a good in between), it should also be 64 bitaligned */
+#define __NMAP_DEFAULT_PAGESIZE (sizeof(void*)*3) /* this needs to be in an between of not to small to make the free list \
+                                      insufficient to not too large for slowing down cache speeds (24 is a good in between), it should also be 64 bit aligned */
 
 /* these values assume an mmap and shm page size of 4096 */
 #define __NMAP_DB_CAP 0x10000000000ULL        /* size cap (in bytes) per database shouldn't be larger than 128T to fit inside address space boundaries of linux  */
@@ -94,15 +94,19 @@ struct _nmap *nmap_openStorage(const char *name)
     xstrappends(&str, (char *)name); /* database name */
     xstrappends(&str, ".ndb");
 
+    xstrcreateft(sharedmem, (char *)name);
+    xstrappends(&sharedmem, "_ndb");
+
     /* open shared db memory */
-    int db_shm = shm_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    int db_shm = shm_open(xstrserialize(sharedmem), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    free(sharedmem._str);
     if (db_shm == -1)
     {
         perror("nmap_openStorage shm_open");
         return null;
     }
     lseek(db_shm, SEEK_SET, sizeof(struct _nmap));
-    write(db_shm, t, 1);
+    write(db_shm, t, 1); /* write dummy byte, variable wouldn't matter */
 
     /* attach shared db memory */
     struct _nmap *map;
@@ -188,8 +192,120 @@ struct _nmap *nmap_openStorage(const char *name)
     return (void *)map;
 }
 
-NMap *nmap_openStorageOnDevice(char *name, const char *deviceId)
+NMap *nmap_openStorageOnDevice(const char *name, const char *deviceId)
 {
+    xstrcreateft(sharedmem, (char *)name);
+    xstrappends(&sharedmem, "_ndb");
+
+    /* open shared db memory */
+    int db_shm = shm_open(xstrserialize(sharedmem), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    free(sharedmem._str);
+    if (db_shm == -1)
+    {
+        perror("nmap_openStorage shm_open");
+        return null;
+    }
+    lseek(db_shm, SEEK_SET, sizeof(struct _nmap));
+    write(db_shm, &db_shm, 1); /* dummy byte */
+
+    /* attach shared db memory */
+    struct _nmap *map;
+    if ((map = (struct _nmap *)mmap(null, sizeof(struct _nmap), PROT_READ | PROT_WRITE, MAP_SHARED, db_shm, 0)) == MAP_FAILED)
+    {
+        perror("nmap_openStorage mmap 1");
+        return null;
+    }
+
+    /* load database file */
+    int dbfd;
+    if ((dbfd = open(deviceId, O_RDWR, S_IRUSR | S_IWUSR)) == -1)
+    {
+        /* database constructor - start */
+        if ((dbfd = open(deviceId, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR)) == -1)
+        {
+            perror("nmap_openStorage open 1");
+            return null;
+        }
+
+        /* create info filepath */
+        char *t = getenv("HOME");
+        if (t == null)
+        {
+            printf("nmap_openStorage getenv: HOME env not set\n");
+            return null;
+        }
+        xstrcreateft(str, t);
+
+        /* default nmap storage directory */
+        xstrappends(&str, __NMAP_DIR);
+        mkdir(xstrserialize(str), S_IRUSR | S_IWUSR);
+
+        /* database directory */
+        xstrappends(&str, __NMAP_DBDIR);
+        mkdir(xstrserialize(str), S_IRUSR | S_IWUSR);
+
+        xstrappendc(&str, '/');
+        xstrappends(&str, __NMAP_INF); /* address info file */
+        /* collect address info */
+        /* collect map addresses from info directory */
+        int info;
+        if (((info = open(xstrserialize(str), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR))) == -1)
+        {
+            perror("nmap_openStorage open 2");
+            return null;
+        }
+        free(str._str);
+        read(info, &map->map_addr, sizeof(void *));
+
+        map->map_addr += __NMAP_DB_CAP;
+
+        map->dbfd = (int)6000 + (((unsigned long long)map->map_addr) / __NMAP_DB_CAP); /* creates a unique fd if __NMAP_DB_CAP is significantly larger than 2¹⁶ */
+        lseek(info, 0, SEEK_SET);                                                      /* needed because open for some reason doesn't open the file with offset set to 0 */
+        write(info, &map->map_addr, sizeof(void *));
+        close(info);
+
+        lseek(dbfd, __NMAP_DEFAULT_INITBUFFERSIZE, SEEK_CUR);
+        write(dbfd, &(char){0}, 1); /* write dummy byte to complete truncate operation */
+
+        map->dbcapacity = __NMAP_DEFAULT_INITBUFFERSIZE;
+        map->dbsize = sizeof(struct _nmap);
+
+        /* load mmap */
+        if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, dbfd, 0) != map->map_addr)
+        {
+            printf("nmap_openStorage database limit reached\n");
+            return null;
+        }
+        if (dup2(dbfd, map->dbfd) == -1) /* should work in most cases to produce an unique descriptor by shifting the map address 16 bytes and casting it to int */
+        {
+            perror("nmap_openStorage dup2");
+            return null;
+        }
+
+        /* write database name to map */
+        register int name_len = strlen(name);
+        map->name = (char *)nmap_qalloc(map, name_len * sizeof(char));
+        memcpy(map->name, name, name_len);
+        map->dbdir = map->map_addr + map->dbsize;
+        return (void *)map;
+        /* database constructor - end */
+    }
+    read(dbfd, map, sizeof(struct _nmap)); /* collect database object */
+    /* load mmap */
+    //printf("map->map_addr: %llu, map->dbcapacity: %llu, dbfd: %d, map->dbsize: %llu\n", map->map_addr, map->dbcapacity, dbfd, map->dbsize);
+    if (mmap(map->map_addr, map->dbcapacity, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, dbfd, 0) == MAP_FAILED)
+    {
+        perror("nmap_openStorage mmap 2");
+        return null;
+    }
+
+    if (dup2(dbfd, map->dbfd) == -1) /* should work in most cases to produce an unique descriptor by shifting the map address 16 bytes and casting it to int */
+    {
+        perror("nmap_openStorage dup2");
+        return null;
+    }
+
+    return (void *)map;
 }
 
 void nmap_closeStorage(NMap *map)
@@ -204,9 +320,9 @@ void nmap_closeStorage(NMap *map)
     munmap(map, sizeof(NMap));
 }
 
-void* nmap_optainDbDir(NMap*map, _nmap_size size)
+void *nmap_optainDbDir(NMap *map, _nmap_size size)
 {
-    if((map->map_addr + map->dbsize) == map->dbdir)
+    if ((map->map_addr + map->dbsize) == map->dbdir)
         nmap_qalloc(map, size);
     return map->dbdir;
 }
@@ -218,6 +334,12 @@ const char *nmap_getDbName(struct _nmap *map)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattributes"
+
+ _nmap_size nmap_getPageSize()
+{
+    return __NMAP_DEFAULT_PAGESIZE;
+}
+
 static __attribute__((__always_inline__)) void nmap_grow(struct _nmap *map)
 {
     munmap(map->map_addr, map->dbcapacity);
