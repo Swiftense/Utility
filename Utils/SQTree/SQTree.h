@@ -6,33 +6,34 @@ extern "C"
 {
 #endif
 
-    typedef char *qtr_K;
-    typedef void *qtr_V;
+#include <sys/ioctl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
 
-    typedef NMap SQTree;
-    typedef struct _sqn SQNode;
+#include "../String/String.h"
+#include "../debug.h"
 
-#include "String/String.h"
-#include "NMap.h"
-
-    struct _sqn
+#ifndef CLIENT_DEF
+    struct _qNode
     {
-        SNode *rightRoot;
-        SNode *leftRoot;
-        qtr_K key;
-        qtr_V value;
+        char *key;
+        char *value;
     };
+#endif
 
-    struct _sqtr
-    {
-        SNode *rightRoot;
-        SNode *leftRoot;
-    };
+    typedef struct _qNode SQNode;
+    typedef struct _qTree SQTree; /* Root node */
 
-    void sqtr_setEntry(NMap map, qtr_K key, qtr_V value);
-
-    qtr_V sqtr_getValue(NMap map, qtr_K key);
-
+    SQTree *sqtr_open(const char *name);
+    void sqtr_foreach(SQNode *branch, void (*itr)(SQNode *node));
+    void sqtr_set(SQTree *tree, char *key, char *value);
+    void sqtr_sets(SQTree *tree, char* key, char *value, int value_size);
+    SQNode *sqtr_optain(SQTree *tree, char *key);
+    void sqtr_close(SQTree *tree);
+    debug int sqtr_size(SQNode *branch, int size);
+    debug int sqtr_longbr(SQTree *tree);
 
 #ifdef __cplusplus
 }

@@ -18,8 +18,6 @@
 #include <sys/types.h>
 
 #define __NMAP_DEFAULT_INITBUFFERSIZE sizeof(struct _nmap)
-#define __NMAP_DEFAULT_PAGESIZE (sizeof(void*)*3) /* this needs to be in an between of not to small to make the free list \
-                                      insufficient to not too large for slowing down cache speeds (24 is a good in between), it should also be 64 bit aligned */
 
 /* these values assume an mmap and shm page size of 4096 */
 #define __NMAP_DB_CAP 0x10000000000ULL        /* size cap (in bytes) per database shouldn't be larger than 128T to fit inside address space boundaries of linux  */

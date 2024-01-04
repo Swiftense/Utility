@@ -35,8 +35,10 @@ int dc;
 
 void utdt_check(Pair *p)
 {
-    if (((struct timeinf *)p->value)->average._size > 0)
+    if (((struct timeinf *)p->value)->average._size > 0)  {
         log_time("\e[32mFinished\e[0m objective \e[37m\e[1m'%s'\e[0m after an average time of \e[1m%lF\e[0ms (Total: \e[1m%lF\e[0ms).\n", ((struct timeinf*)p->value)->name, vect_average( ((struct timeinf*)p->value)->average, double), vect_sum( ((struct timeinf*)p->value)->average, double));
+        free(((struct timeinf*)p->value)->average._vect);
+    }
     else
         log_time("\e[91mFailed\e[0m objective \e[37m\e[1m'%s'\e[0m\n", ((struct timeinf *)p->value)->name);
 }
