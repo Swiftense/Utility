@@ -71,7 +71,6 @@ extern "C"
 
 #define timepush(obj) ;
 
-#define timeend(obj) ;
 
 #endif
 

@@ -5,6 +5,9 @@ extern "C"
 {
 #endif
 
+#define __NMAP_DEFAULT_PAGESIZE (sizeof(void *) * 3) /* this needs to be in an between of not to small to make the free list \
+                                         insufficient to not too large for slowing down cache speeds (24 is a good in between), it should also be 64 bit aligned */
+
     typedef unsigned long long _nmap_size;
     typedef struct _nmap NMap;
 
@@ -40,7 +43,7 @@ extern "C"
      * @param size of the database directory size
      * @return the addr of the directory (intitialized to 0 upon first opening)
      */
-    extern void* nmap_optainDbDir(NMap*map, _nmap_size size);
+    extern void *nmap_optainDbDir(NMap *map, _nmap_size size);
 
     /**
      * @param map used storage
