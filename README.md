@@ -1,5 +1,6 @@
 <h1>Swiftense Utility Library</h1>
 A basic utility Library that is used across the Project and contains a variety of different Algorithms.
+Was written mostly for educational purposes is not up to industry standards.
 <h2>List</h2>
 <ul>
 <li><strong>Text Parser</strong> (Utils/StringIterator/StringIterator.h)</li>
