@@ -33,10 +33,13 @@ void xstrappendi(XString *str, int num)
         num = __builtin_copysignq(num, 1);
     }
     register unsigned int reversed = 0;
-    for (; num != 0; num /= DEF_CONVERT_RADIX)
+    int nullshift = 0;
+    for (; num != 0; nullshift = (reversed == 0) ? (nullshift + 1) : (nullshift), num /= DEF_CONVERT_RADIX)
         reversed = reversed * DEF_CONVERT_RADIX + (num % DEF_CONVERT_RADIX);
     for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+    for (; nullshift > 0; nullshift--)
+        xstrappendToBuff(str, '0');
 }
 
 void xstrappendl(XString *str, long long num)
@@ -47,28 +50,37 @@ void xstrappendl(XString *str, long long num)
         num = __builtin_copysignq(num, 1);
     }
     register unsigned long long reversed = 0;
-    for (; num != 0; num /= DEF_CONVERT_RADIX)
+    int nullshift = 0;
+    for (; num != 0; nullshift = (reversed == 0) ? (nullshift + 1) : (nullshift), num /= DEF_CONVERT_RADIX)
         reversed = reversed * DEF_CONVERT_RADIX + (num % DEF_CONVERT_RADIX);
     for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+    for (; nullshift > 0; nullshift--)
+        xstrappendToBuff(str, '0');
 }
 
 void xstrappendui(XString *str, unsigned int num)
 {
     register unsigned int reversed = 0;
-    for (; num != 0; num /= DEF_CONVERT_RADIX)
+    int nullshift = 0;
+    for (; num != 0; nullshift = (reversed == 0) ? (nullshift + 1) : (nullshift), num /= DEF_CONVERT_RADIX)
         reversed = reversed * DEF_CONVERT_RADIX + (num % DEF_CONVERT_RADIX);
     for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+    for (; nullshift > 0; nullshift--)
+        xstrappendToBuff(str, '0');
 }
 
 void xstrappendul(XString *str, unsigned long long num)
 {
     register unsigned long long reversed = 0;
-    for (; num != 0; num /= DEF_CONVERT_RADIX)
+    int nullshift = 0;
+    for (; num != 0; nullshift = (reversed == 0) ? (nullshift + 1) : (nullshift), num /= DEF_CONVERT_RADIX)
         reversed = reversed * DEF_CONVERT_RADIX + (num % DEF_CONVERT_RADIX);
     for (; reversed != 0; reversed /= DEF_CONVERT_RADIX)
         xstrappendToBuff(str, strnumchar(reversed % DEF_CONVERT_RADIX));
+    for (; nullshift > 0; nullshift--)
+        xstrappendToBuff(str, '0');
 }
 
 void xstrappendf(XString *str, float f)
